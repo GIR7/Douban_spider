@@ -11,6 +11,20 @@ import urllib.request,urllib.error
 import xlwt #excel
 import sqlite3 #database
 
+
+
+def main():
+    baseurl= "https://movie.douban.com/top250?start="
+    #1.scraping the data & analyze data
+    datalist = getData(baseurl)
+    savepath = "doubantop250movies.xls"
+    #3.store the data into excel
+    saveData(datalist,savepath)
+    #4.store the data into database
+    dbpath = "moviesinfo.db"
+    saveDatedb(datalist,dbpath)
+
+
 #get a specific url data
 def askUrl(url):
     #pretend to be browser to send requests
@@ -34,13 +48,6 @@ def askUrl(url):
             print(err.reason)
     return data
 
-def main():
-    baseurl= "https://movie.douban.com/top250?start="
-    #1.scraping the data
-    datalist = getData(baseurl)
-    savepath = "doubantop250movies.xls"
-    #3.store the data
-    saveData(datalist,savepath)
 
 #create a object of regex, which is the pattern of regex 
 #This is what the link looks like: <a href="https://movie.douban.com/subject/1291546/">
@@ -74,7 +81,7 @@ def getData(baseurl):
     print("Start scraping data...")
     datalist = []
 
-  #ALL the pages
+    #ALL the pages
     for i in range(0,10):  
         # get different url for each page
         url = baseurl + str(i*25)
@@ -84,7 +91,7 @@ def getData(baseurl):
         #2.analyze the data
         
         soup = BeautifulSoup(htmlData,"html.parser")
-        #find all the part meets the needs, then make a list
+        #retrieve all the part meets the needs, then make a list
         for item in soup.find_all('div',class_="item"):
             data = [] #store the info for ONE movie
             item = str(item)#convert it to string
@@ -147,6 +154,49 @@ def saveData(datalist,path):
     
     workbook.save(path)
     print("Save finished!")
+
+
+def saveDatedb(datalist,path):
+    initDb(path)
+    conn = sqlite3.connect(path)
+    cur = conn.cursor()
+
+    for data in datalist:
+        for index in range(len(data)):
+            if index == 4: #rate:numeric
+                continue
+            data[index] ='"'+data[index]+'"' #adding qutation for each value
+        sql = '''
+            insert into movie(link,imglink,cname,oname,rate,intro,content)
+            values(%s)'''%",".join(data) #data value seperate by comma to replace "%s" 
+        #print(sql)
+        cur.execute(sql)
+        conn.commit()
+    cur.close()
+    conn.close()
+
+
+def initDb(path):
+    #Initailize a movie info table
+    sql = '''
+    create table movie
+    (
+        id integer primary key autoincrement,
+        link text,
+        imglink text,
+        cname varchar,
+        oname varchar,
+        rate numeric,
+        intro text,
+        content text
+    )
+    '''
+    conn = sqlite3.connect(path)#create db
+    cur = conn.cursor()#getting cursor
+    cur.execute(sql)#execute command, create a table
+    conn.commit()#commit db change
+    conn.close()
+
 
 if __name__ == "__main__":
     main()
